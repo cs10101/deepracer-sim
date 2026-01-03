@@ -1,0 +1,16 @@
+gymnasium
+numpy
+matplotlib
+opencv-python
+torch
+torchvision
+torchaudio
+stable-baselines3
+pygame
+boto3
+Pillow
+scipy
+pandas
+scikit-learn
+jupyter
+ipykernel
