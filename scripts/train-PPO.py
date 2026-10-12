@@ -53,7 +53,7 @@ MODEL_PATH = "scripts/ppo_rect_circuit_forward_only.zip"
 print("Looking for model at:", os.path.abspath(MODEL_PATH))
 print("Exists?", os.path.exists(MODEL_PATH))
 
-if os.path.exists(MODEL_PATH + ".zip"):
+if os.path.exists(MODEL_PATH):
     print("Loading existing model...")
     model = PPO.load(MODEL_PATH, env=env)
 else:

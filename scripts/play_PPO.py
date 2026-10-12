@@ -23,7 +23,7 @@ env = RectCircuitEnv(
 )
 
 # this is how we load the pre-trained model which will control the car in the rendered enviornment
-model = PPO.load("scripts/ppo_rect_circuit_forward_only")
+model = PPO.load("scripts/scripts/ppo_rect_circuit_forward_only")
 
 # reset the environment to get the initial observation
 obs, _ = env.reset()
