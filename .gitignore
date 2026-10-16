@@ -135,5 +135,7 @@ logs/
 __pycache__/
 *.pyc
 
+*.csv
+
 # AWS DeepRacer specific (if any)
 # Add any specific files or folders related to DeepRacer simulation

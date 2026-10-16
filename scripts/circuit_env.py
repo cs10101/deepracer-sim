@@ -86,6 +86,15 @@ class RectCircuitEnv(gym.Env):
         self.last_s = 0.0
         self.last_pos = (0.0, 0.0)
 
+        # Lap tracking
+        self.completed_laps = 0 # counts how many full laps the agent does
+        self.current_lap_steps = 0 # records the number of simulated steps since the current lap began
+        self.lap_times = [] # stores duration of each completed lap
+        self.fastest_lap = None # stores the quickest completed lap
+
+        # cumulative forward progress for lap detection
+        self.lap_progress = 0.0 # tracks accumulated forward movement around the track
+
     # ---------- Geometry / progress helpers ----------
     def _closest_point_on_segment(px, py, ax, ay, bx, by):
         # vector AB
@@ -261,6 +270,13 @@ class RectCircuitEnv(gym.Env):
         self.cp_len = P / self.num_checkpoints
         self.visited_cps = set()
 
+        # this new section is for reseting the current number of laps after each training episode
+        self.completed_laps = 0
+        self.current_lap_steps = 0
+        self.lap_times = []
+        self.fastest_lap = None
+        self.lap_progress = 0.0
+
         if self.render:
             p.resetDebugVisualizerCamera(
                 cameraDistance=8.0, cameraYaw=40, cameraPitch=-35,
@@ -337,6 +353,9 @@ class RectCircuitEnv(gym.Env):
             ds += P
         elif ds > P/2:
             ds -= P
+
+        previous_s = self.last_s
+
         self.last_s = s
 
         ds_fwd = max(0.0, ds) # ignore backwards movement
@@ -374,6 +393,44 @@ class RectCircuitEnv(gym.Env):
         if hit_wall:
             ds_fwd = 0.0
             checkpoint_reward = 0.0
+
+        # lap tracking logic
+        # count the current simulation step
+        self.current_lap_steps += 1
+
+        # accumulate forward progress around the track
+        self.lap_progress += ds
+
+        # check whether the agent has completed a full lap
+        # only count a lap after enough progress and a start-line crossing
+        crossed_start = previous_s > (0.75 * P) and s < (0.25 * P)
+
+        if (
+            crossed_start 
+            and ds > 0 
+            and self.lap_progress >= (0.95 * P) 
+            and len(self.visited_cps) == self.num_checkpoints
+            and not hit_wall 
+            and dist <= (self.HALF_W * 0.95)
+        ):
+            lap_time = self.current_lap_steps * self.dt
+
+            self.completed_laps += 1
+            self.lap_times.append(lap_time)
+            self.fastest_lap = min(self.lap_times)
+
+            print(
+                f"Lap completed | "
+                f"Time: {lap_time:.2f}s | "
+                f"Fastest: {self.fastest_lap:2f}s"
+            )
+
+            # prepare for the next lap
+            self.current_lap_steps = 0
+            self.lap_progress = 0.0
+            self.visited_cps.clear()
+
+        
 
         # ----- reward shaping -----
         progress_reward = 3.0 * ds_fwd
@@ -439,7 +496,27 @@ class RectCircuitEnv(gym.Env):
             truncated = True
 
         obs = self._get_obs()
-        info = {"dist": dist, "ds": ds, "hit_wall": hit_wall, "v": self.v, "w": self.w, "speed": speed}
+
+        off_track = dist > (self.HALF_W * 0.95)
+
+        info = {"dist": dist,
+                "ds": ds, 
+                "hit_wall": hit_wall, 
+                "v": self.v, 
+                "w": self.w, 
+                "speed": speed,
+                "completed_laps": self.completed_laps,
+                "lap_times": self.lap_times.copy(),
+                "fastest_lap": self.fastest_lap,
+                "off_track": off_track
+                }
+
+        info.update({
+            "completed_laps": self.completed_laps,
+            "lap_times": self.lap_times.copy(),
+            "fastest_time": self.fastest_lap,
+            "lap_progress": self.lap_progress
+        })
 
         if self.steps % 20 == 0:  # print every 20 steps so it doesn't spam
             print(
